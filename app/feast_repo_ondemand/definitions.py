@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 
-from feast import Entity, FeatureView, Field, FileSource, RequestSource
+from feast import Entity, FeatureView, Field, FileSource, RequestSource, ValueType
 from feast.types import Float64, Int64
 
 # GOTCHA (feast 0.65): `from feast import on_demand_feature_view` gives you the
@@ -25,7 +25,7 @@ from feast.on_demand_feature_view import on_demand_feature_view
 
 _HERE = Path(__file__).resolve().parent
 
-user = Entity(name="user", join_keys=["user_id"])
+user = Entity(name="user", join_keys=["user_id"], value_type=ValueType.STRING)
 
 user_spend_source = FileSource(
     name="user_spend_source",
