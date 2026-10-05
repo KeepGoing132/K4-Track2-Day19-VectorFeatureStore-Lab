@@ -77,7 +77,12 @@ class Embedder:
         p = self.spec.provider
         if p == "fastembed":
             from fastembed import TextEmbedding
-            self._impl = TextEmbedding(model_name=self.spec.model)
+            # ONNX's automatic thread count slows short queries on many-core
+            # laptops. Bound the pool while allowing explicit local tuning.
+            threads = int(os.getenv("EMBEDDING_THREADS", "4"))
+            if threads < 1:
+                raise ValueError("EMBEDDING_THREADS must be a positive integer")
+            self._impl = TextEmbedding(model_name=self.spec.model, threads=threads)
         elif p == "sentence-transformers":
             try:
                 from sentence_transformers import SentenceTransformer

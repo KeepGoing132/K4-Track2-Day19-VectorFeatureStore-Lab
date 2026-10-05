@@ -125,6 +125,28 @@ flowchart TD
 
 ## 6. Giới hạn hiện tại của bản POC (Honest Limitations)
 
+**Phạm vi đã triển khai:** `HybridMemoryAgent` dùng `Embedder` theo cấu hình
+lab, Qdrant in-memory và BM25/RRF. Mỗi lần `remember()` lưu toàn bộ ghi chú
+thành một chunk; semantic window và overlap ở mục 3 là hướng mở rộng.
+BM25 dựng theo người dùng đang truy vấn; Qdrant lọc `user_id` trước khi lấy
+top-K. Context kiểm tra lại chủ sở hữu của từng ký ức.
+
+`bonus/feature_store.py` đọc Feast thật từ repo NB4, gồm
+`reading_speed_wpm`, `preferred_language`, `topic_affinity` (TTL 30 ngày,
+nguồn `user_profile.parquet`) và `queries_last_hour`, `distinct_topics_24h`
+(TTL 1 giờ, nguồn `query_velocity.parquet`). `night_fatigue_index` chưa có
+trong schema hiện tại. Mock chỉ dùng khi được truyền rõ vào constructor để
+kiểm thử offline.
+
+POC ghi bộ đếm truy vấn vào Feast online store sau mỗi lần recall. Cửa sổ
+một giờ được tính bằng deque trong một tiến trình, bắt đầu từ phiên hiện tại;
+không cộng các lượt tổng hợp giả lập trong Parquet. Bộ đếm được đọc lại qua
+Feast trước khi ghép context. Nó chưa có Kafka, worker micro-batch, đồng bộ
+nhiều tiến trình hoặc lịch sử sự kiện bền vững. `distinct_topics_24h` giữ giá
+trị batch từ NB4; chưa được tính lại từ query. LLM ở sơ đồ là bước dự kiến:
+demo trả context và không gọi model sinh văn bản. Các con số cải thiện dung
+lượng/IOPS ở phần thiết kế là ước lượng, chưa được benchmark bởi POC.
+
 1. **Chưa có cơ chế Memory Decay (Quên theo thời gian):** Ký ức từ 6 tháng trước vẫn có trọng số ngang bằng ký ức hôm qua nếu độ tương đồng cosine bằng nhau. Cần bổ sung đường cong suy giảm Ebbinghaus: $\text{score} = \text{similarity} \times e^{-\lambda \Delta t}$.
 2. **Bảo mật Multi-tenant ở tầng ứng dụng:** Bản POC hiện đang dùng payload filtering (`user_id == "u_001"`). Trong môi trường doanh nghiệp quy mô lớn, cần cô lập ở tầng collection hoặc mã hoá riêng biệt khoá per-user (Envelope Encryption).
 3. **Đồng bộ hóa phân tán:** Hiện tại luồng cập nhật bộ nhớ chạy đồng bộ; nếu người dùng nhập tài liệu lớn (PDF 100 trang), ứng dụng sẽ bị block trừ khi chuyển sang kiến trúc background job worker (Celery/Temporal).

@@ -9,14 +9,13 @@ Part of Day 19 Bonus Challenge.
 from __future__ import annotations
 
 import math
-import os
+import hashlib
 import re
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-# Attempt importing production dependencies; fallback gracefully if in lite/offline mode
+# Optional retrieval dependencies; tests can explicitly inject an offline profile store.
 try:
     from fastembed import TextEmbedding
     _HAS_FASTEMBED = True
@@ -106,7 +105,7 @@ class FallbackEmbedder:
             vec = [0.0] * self.dim
             words = re.findall(r"\w+", text.lower())
             for i, w in enumerate(words):
-                h = hash(w) % self.dim
+                h = int.from_bytes(hashlib.blake2b(w.encode("utf-8"), digest_size=8).digest(), "big") % self.dim
                 vec[h] += 1.0 / (1.0 + i * 0.05)
             norm = math.sqrt(sum(v * v for v in vec)) or 1.0
             results.append([v / norm for v in vec])
@@ -114,7 +113,7 @@ class FallbackEmbedder:
 
 
 class MockFeastOnlineStore:
-    """Simulates Feast online store serving user profiles & streaming activity (< 2ms)."""
+    """Explicitly injected offline profile store for tests, separate from Feast."""
     def __init__(self):
         self._profiles: Dict[str, Dict[str, Any]] = {
             "u_001": {
@@ -139,7 +138,11 @@ class MockFeastOnlineStore:
 
     def get_online_features(self, entity_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
         user_id = entity_rows[0].get("user_id", "u_001")
-        return self._profiles.get(user_id, self._profiles["u_001"])
+        return dict(self._profiles.get(user_id, {
+            "user_id": user_id, "topic_affinity": "unknown",
+            "reading_speed_wpm": 0, "preferred_lang": "unknown",
+            "queries_last_hour": 0, "distinct_topics_24h": 0,
+        }))
 
     def record_query(self, user_id: str) -> None:
         if user_id in self._profiles:
@@ -149,21 +152,22 @@ class MockFeastOnlineStore:
 class HybridMemoryAgent:
     """Agent combining Episodic Memory (Vector + BM25 RRF) with Feast Feature Store."""
 
-    def __init__(self, collection_name: str = "user_memories"):
+    def __init__(self, collection_name: str = "user_memories", feature_store=None):
         self.collection_name = collection_name
-        self.feast = MockFeastOnlineStore()
+        if feature_store is None:
+            from bonus.feature_store import FeastOnlineStore
+            feature_store = FeastOnlineStore()
+        self.feast = feature_store
         self.memories: Dict[str, MemoryRecord] = {}
         self.bm25 = StandaloneBM25()
         self._memory_counter = 0
 
         # Try to use FastEmbed and Qdrant if available
         if _HAS_FASTEMBED:
-            try:
-                self.embedder = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-                self.embed_dim = 384
-            except Exception:
-                self.embedder = FallbackEmbedder()
-                self.embed_dim = 64
+            from app.embeddings import Embedder
+            self.embedder = Embedder()
+            self.embedder._load()
+            self.embed_dim = self.embedder.dim
         else:
             self.embedder = FallbackEmbedder()
             self.embed_dim = 64
@@ -230,6 +234,9 @@ class HybridMemoryAgent:
                 res = self.qdrant.query_points(
                     collection_name=self.collection_name,
                     query=q_vec,
+                    query_filter=Filter(must=[FieldCondition(
+                        key="user_id", match=MatchValue(value=user_id),
+                    )]),
                     limit=top_k,
                 )
                 return [p.payload["mem_id"] for p in res.points if p.payload.get("user_id") == user_id]
@@ -243,6 +250,9 @@ class HybridMemoryAgent:
         return [mem_id for mem_id, _ in scored[:top_k]]
 
     def _search_bm25(self, query: str, user_id: str, top_k: int = 10) -> List[str]:
+        # Rebuild for the requested user, rather than whoever last wrote a note.
+        user_mems = [m for m in self.memories.values() if m.user_id == user_id]
+        self.bm25.fit([m.id for m in user_mems], [m.text for m in user_mems])
         scored = self.bm25.score(query)
         return [mem_id for mem_id, score in scored if score > 0.0][:top_k]
 
@@ -263,12 +273,13 @@ class HybridMemoryAgent:
     def recall(self, query: str, user_id: str = "u_001") -> str:
         """Retrieve top-K memories + user profile features -> return assembled context."""
         # 1. Get user profile + recent activity from Feast online store
-        profile = self.feast.get_online_features([{"user_id": user_id}])
         self.feast.record_query(user_id)
+        profile = self.feast.get_online_features([{"user_id": user_id}])
 
         # 2. Hybrid search Qdrant / episodic memory filtered by user_id
         top_mem_ids = self._search_hybrid(query, user_id, top_k=3)
-        retrieved_texts = [f"- {self.memories[mid].text}" for mid in top_mem_ids if mid in self.memories]
+        retrieved_texts = [f"- {self.memories[mid].text}" for mid in top_mem_ids
+                           if mid in self.memories and self.memories[mid].user_id == user_id]
         memories_str = "\n".join(retrieved_texts) if retrieved_texts else "- (Chưa có ký ức tương đồng trực tiếp)"
 
         # 3. Assemble context string
@@ -277,7 +288,7 @@ class HybridMemoryAgent:
             f"User profile: likes <{profile['topic_affinity']}> reading at <{profile['reading_speed_wpm']}>wpm. "
             f"Preferred lang: <{profile['preferred_lang']}>.\n"
             f"Recent activity: <{profile['queries_last_hour']}> queries last hour. "
-            f"Fatigue index: <{profile['night_fatigue_index']:.2f}>.\n"
+            f"Distinct topics (24h): <{profile.get('distinct_topics_24h', 'unknown')}>.\n"
             f"Top episodic memories retrieved:\n{memories_str}\n"
             f"Target Query: \"{query}\"\n"
             f"=============================="

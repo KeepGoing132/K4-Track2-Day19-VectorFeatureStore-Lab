@@ -1,0 +1,117 @@
+{
+  "method": "Playwright page.screenshot of real JupyterLab UI",
+  "browser": "msedge",
+  "viewport": {
+    "width": 1600,
+    "height": 1100
+  },
+  "images": [
+    {
+      "file": "01_embeddings_index.png",
+      "source": "notebooks/01_embeddings_index.ipynb",
+      "anchor": "Indexed: 1000 vectors",
+      "source_sha256": "14acacb5b6feb2872fe818885e6c49ee36e27151fdc20beb14ba950d12f90f95"
+    },
+    {
+      "file": "01_paraphrase_top5.png",
+      "source": "notebooks/01_embeddings_index.ipynb",
+      "anchor": "Query (paraphrase):",
+      "source_sha256": "14acacb5b6feb2872fe818885e6c49ee36e27151fdc20beb14ba950d12f90f95"
+    },
+    {
+      "file": "02_hybrid_search_rrf.png",
+      "source": "notebooks/02_hybrid_search_rrf.ipynb",
+      "anchor": "Precision@10 (avg over",
+      "source_sha256": "222d1d0724b87b291985b260dc0c34377ac9d1e39320217d93656e7650975e48"
+    },
+    {
+      "file": "03_search_api_benchmark.png",
+      "source": "notebooks/03_search_api_benchmark.ipynb",
+      "anchor": "P99(wall)",
+      "source_sha256": "a93cf05cd5b9bcefe5882de7388c04bd7cf57d79e1e3953356ea307a284aacff"
+    },
+    {
+      "file": "03_api_response.png",
+      "source": "notebooks/03_search_api_benchmark.ipynb",
+      "anchor": "latency_ms:",
+      "source_sha256": "a93cf05cd5b9bcefe5882de7388c04bd7cf57d79e1e3953356ea307a284aacff"
+    },
+    {
+      "file": "04_feast_feature_store.png",
+      "source": "notebooks/04_feast_feature_store.ipynb",
+      "anchor": "Single lookup:",
+      "source_sha256": "99df7b72fb350dfad52056e8b8def355fb385412fa7bca095acd425ee170afcd"
+    },
+    {
+      "file": "04_feast_apply.png",
+      "source": "notebooks/04_feast_feature_store.ipynb",
+      "anchor": "Applying changes for project",
+      "source_sha256": "99df7b72fb350dfad52056e8b8def355fb385412fa7bca095acd425ee170afcd"
+    },
+    {
+      "file": "04_feast_apply_completed.png",
+      "source": "notebooks/04_feast_feature_store.ipynb",
+      "anchor": "No changes to infrastructure",
+      "source_sha256": "99df7b72fb350dfad52056e8b8def355fb385412fa7bca095acd425ee170afcd"
+    },
+    {
+      "file": "04_feast_materialize.png",
+      "source": "notebooks/04_feast_feature_store.ipynb",
+      "anchor": "Materializing 3 feature views from",
+      "source_sha256": "99df7b72fb350dfad52056e8b8def355fb385412fa7bca095acd425ee170afcd"
+    },
+    {
+      "file": "05_filtered_search.png",
+      "source": "notebooks/05_filtered_search.ipynb",
+      "anchor": "post_ms",
+      "source_sha256": "347463a0b6b61ddd85b8ef5bf3b33a2b26368459d753380e636d6745b849f390"
+    },
+    {
+      "file": "06_agent_retrieval.png",
+      "source": "notebooks/06_agent_retrieval.ipynb",
+      "anchor": "Δ recall vs single-shot:",
+      "source_sha256": "4b3f4b0e2a5a237cfce461e0179b270f94dd4aa8208847e42557b67ea1b775d4"
+    },
+    {
+      "file": "07_semantic_cache.png",
+      "source": "notebooks/07_semantic_cache.ipynb",
+      "anchor": "NGUY HIỂM",
+      "source_sha256": "1046b43e9551563651d3d9cf96655ab1155cdd2b1d29fbe4a505478594fe66ea"
+    },
+    {
+      "file": "07_cache_tenant_isolation.png",
+      "source": "notebooks/07_semantic_cache.ipynb",
+      "anchor": "namespaced=False",
+      "source_sha256": "1046b43e9551563651d3d9cf96655ab1155cdd2b1d29fbe4a505478594fe66ea"
+    },
+    {
+      "file": "08_feature_engineering.png",
+      "source": "notebooks/08_feature_engineering.ipynb",
+      "anchor": "target-naive",
+      "source_sha256": "03ca2f0c1de061f16659d19c763f2a7e29caf3241650d6bdd0db0d0249e7f99e"
+    },
+    {
+      "file": "08_point_in_time_join.png",
+      "source": "notebooks/08_feature_engineering.ipynb",
+      "anchor": "training rows",
+      "source_sha256": "03ca2f0c1de061f16659d19c763f2a7e29caf3241650d6bdd0db0d0249e7f99e"
+    },
+    {
+      "file": "08_on_demand_features.png",
+      "source": "notebooks/08_feature_engineering.ipynb",
+      "anchor": "user=u_000",
+      "source_sha256": "03ca2f0c1de061f16659d19c763f2a7e29caf3241650d6bdd0db0d0249e7f99e"
+    },
+    {
+      "file": "bonus_hybrid_memory_demo.png",
+      "source": "submission/bonus_demo.txt",
+      "source_sha256": "8520f31b544b95e374560496b403fe65066f3f494883e4c1d8154d0c4ec9ffe9"
+    },
+    {
+      "file": "bonus_demo_completed.png",
+      "source": "submission/bonus_demo.txt",
+      "source_sha256": "8520f31b544b95e374560496b403fe65066f3f494883e4c1d8154d0c4ec9ffe9"
+    }
+  ],
+  "captured_at_utc": "2026-10-05T13:43:48.286801+00:00"
+}

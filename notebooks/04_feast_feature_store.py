@@ -1,7 +1,16 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: py:percent
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.19.6
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
 # ---
 
 # %% [markdown]
@@ -16,6 +25,7 @@
 
 # %%
 import _setup  # noqa: F401
+import json
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -38,7 +48,7 @@ NOW = datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def make_user_profile(n_users: int = 100) -> pl.DataFrame:
-    return pl.DataFrame({
+    latest = pl.DataFrame({
         "user_id": [f"u_{i:03d}" for i in range(n_users)],
         "reading_speed_wpm": [180 + (i * 7) % 200 for i in range(n_users)],
         "preferred_language": ["vi" if i % 3 != 0 else "en" for i in range(n_users)],
@@ -48,11 +58,20 @@ def make_user_profile(n_users: int = 100) -> pl.DataFrame:
         ],
         "event_timestamp": [NOW - timedelta(hours=i % 48) for i in range(n_users)],
     })
+    # An older snapshot lets PIT lookup return features for events predating
+    # the latest profile update, without borrowing values from the future.
+    baseline = latest.with_columns(
+        pl.lit(NOW - timedelta(days=2)).alias("event_timestamp"),
+        (pl.col("reading_speed_wpm") - 7).alias("reading_speed_wpm"),
+    )
+    return pl.concat([baseline, latest])
 
 
 def make_item_popularity(n_items: int = 1000) -> pl.DataFrame:
+    corpus = [json.loads(line) for line in (REPO_ROOT / "data" / "corpus_vn.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert n_items <= len(corpus), "Seed enough documents before generating item features"
     return pl.DataFrame({
-        "doc_id": [f"item_{i:04d}" for i in range(n_items)],
+        "doc_id": [doc["doc_id"] for doc in corpus[:n_items]],
         "click_count_24h": [(i * 13) % 500 for i in range(n_items)],
         "ctr_7d": [round(((i * 7) % 100) / 100.0, 3) for i in range(n_items)],
         "avg_dwell_seconds": [10.0 + (i * 0.7) % 90 for i in range(n_items)],
@@ -102,7 +121,17 @@ assert res.returncode == 0, f"feast apply failed: {res.stderr}"
 # (per entity_key) vào online store. SQLite trong lite path; Redis trong docker path.
 
 # %%
-end_dt = NOW.strftime("%Y-%m-%dT%H:%M:%S")
+end_dt = (NOW + timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%S")
+# These synthetic sources are regenerated on every run, including older rows.
+# Backfill the full window so an existing materialization cursor cannot skip
+# corrected doc IDs or profile history. Then demonstrate incremental refresh.
+start_dt = (NOW - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%S")
+backfill = subprocess.run(
+    ["feast", "materialize", start_dt, end_dt],
+    cwd=str(FEAST_DIR), capture_output=True, text=True, check=False,
+)
+print(backfill.stdout[-1500:])
+assert backfill.returncode == 0, f"backfill failed: {backfill.stderr}"
 res = subprocess.run(
     ["feast", "materialize-incremental", end_dt],
     cwd=str(FEAST_DIR),
@@ -145,6 +174,13 @@ features = fs.get_online_features(
 single_latency_ms = (time.perf_counter() - t0) * 1000
 print(f"Single lookup: {single_latency_ms:.2f}ms")
 print({k: v[0] for k, v in features.items()})
+first_doc = json.loads((REPO_ROOT / "data" / "corpus_vn.jsonl").read_text(encoding="utf-8").splitlines()[0])["doc_id"]
+item_values = fs.get_online_features(
+    features=["item_popularity_features:click_count_24h"],
+    entity_rows=[{"doc_id": first_doc}],
+).to_dict()
+assert item_values["click_count_24h"][0] is not None, "Corpus doc ID missing from online item features"
+print("Online item lookup:", item_values)
 
 # %% [markdown]
 # ## 5. TODO — Batch latency benchmark (100 lookups, P99)
@@ -196,6 +232,9 @@ historical = fs.get_historical_features(
     ],
 ).to_df()
 print(historical)
+assert len(historical) == len(entity_df) == 3, "PIT join must preserve all three events"
+pit_speeds = historical.set_index("user_id")["reading_speed_wpm"].to_dict()
+assert pit_speeds == {"u_001": 180, "u_002": 194, "u_003": 201}, "PIT join used a future snapshot"
 
 # %% [markdown]
 # ## Deliverable evidence

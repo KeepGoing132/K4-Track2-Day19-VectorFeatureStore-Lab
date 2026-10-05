@@ -35,6 +35,59 @@ make lab              # Jupyter Lab on :8888
 
 Yêu cầu: **Python 3.10–3.14**. Không cần Docker, không cần GPU, không cần OpenAI key.
 
+### Windows / PowerShell
+
+Với Python 3.10–3.13, có thể chạy trực tiếp mà không cần Bash hoặc Make:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:PYTHONIOENCODING = "utf-8"
+.venv\Scripts\python.exe scripts/seed_corpus.py
+.venv\Scripts\python.exe scripts/gen_agent_queries.py
+.venv\Scripts\python.exe scripts/gen_spend.py
+.venv\Scripts\python.exe scripts/verify_lite.py
+.venv\Scripts\python.exe -m pytest -q
+.venv\Scripts\python.exe scripts/run_notebooks.py
+.venv\Scripts\python.exe scripts/benchmark.py
+.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
+```
+
+Python 3.14: thay lệnh pip bằng:
+
+```powershell
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt --override overrides-py314.txt
+```
+
+Notebook runner giữ output
+trong `.ipynb` và trả mã lỗi nếu notebook thất bại. Bonus dùng Feast thật;
+chạy NB4 trước `python bonus/demo.py` để tạo và materialize feature store.
+
+`EMBEDDING_THREADS` mặc định là `4` để giới hạn số luồng ONNX cho các truy vấn
+ngắn. Trong PowerShell, đổi bằng `$env:EMBEDDING_THREADS = "4"`.
+`submission/screenshots/` chứa 18 ảnh chụp giao diện JupyterLab thật bằng Edge /
+Playwright, bao gồm NB1–NB8 và log demo bonus. Xem
+[`submission/screenshots/README.md`](submission/screenshots/README.md) để đối
+chiếu ảnh với rubric. Script chụp không chạy lại hoặc sửa output notebook.
+
+Để chụp lại, cài Playwright và khởi động JupyterLab trong thư mục repo:
+
+```powershell
+uv pip install --python .venv\Scripts\python.exe playwright
+.venv\Scripts\python.exe -m jupyterlab --no-browser --ip=127.0.0.1 --port=8888
+```
+
+Giữ Jupyter chạy, mở terminal thứ hai tại repo và chạy:
+
+```powershell
+.venv\Scripts\python.exe scripts/capture_jupyter.py
+```
+
+Script dùng Edge đã cài trên Windows, hoặc `--browser chrome` để dùng Chrome.
+`scripts/generate_screenshots.py` chỉ render log vào `submission/rendered_logs/`,
+không ghi đè ảnh chụp thật. Notebook runner giữ metadata ghép cặp
+`ipynb,py:percent` và kernel Python để Jupyter mở được file `.ipynb` có output.
+
 > **Python 3.14:** `pyarrow` được nới lên `<26` (bản `<22` không có wheel cho
 > 3.14 nên pip cố build từ nguồn và hỏng). Ngoài ra feast pin `dill~=0.3.0`
 > nhưng dill 0.3.9 crash trên 3.14 khi serialize UDF của on-demand feature view

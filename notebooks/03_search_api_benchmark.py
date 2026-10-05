@@ -1,7 +1,16 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: py:percent
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.19.6
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
 # ---
 
 # %% [markdown]
@@ -17,6 +26,7 @@
 import _setup  # noqa: F401
 import statistics
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -31,8 +41,9 @@ import httpx
 # %%
 ROOT = Path(_setup.__file__).resolve().parent.parent
 proc = subprocess.Popen(
-    ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000", "--log-level", "warning"],
+    [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000", "--log-level", "warning"],
     cwd=str(ROOT),
+    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
 )
 
 # Đợi server up + warm (Searcher.from_corpus loads embeddings + indexes 1000 docs)
@@ -89,10 +100,14 @@ def benchmark_mode(mode: str, reps: int = 2) -> dict[str, float]:
     server_latencies: list[float] = []
     wall_latencies: list[float] = []
     with httpx.Client(base_url=URL, timeout=15.0) as client:
+        for q in golden[:10]:
+            response = client.get("/search", params={"q": q["query"], "mode": mode})
+            response.raise_for_status()
         for _ in range(reps):
             for q in golden:
                 t0 = time.perf_counter()
                 r = client.get("/search", params={"q": q["query"], "mode": mode})
+                r.raise_for_status()
                 wall_latencies.append((time.perf_counter() - t0) * 1000)
                 server_latencies.append(r.json()["latency_ms"])
     return {

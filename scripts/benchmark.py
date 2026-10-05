@@ -6,9 +6,8 @@ Reports two tables:
 
 Hybrid uses Reciprocal Rank Fusion (RRF, k=60) over the two ranked lists.
 
-The rubric asserts hybrid strictly beats both pure modes on Precision@10 — the
-corpus + queries (data/corpus_vn.jsonl + data/golden_set.jsonl) are engineered
-to make this true. If hybrid does not win, your fusion implementation is wrong.
+The rubric asks for hybrid to beat both pure modes on Precision@10. This is
+measured, not guaranteed: model choice and the query set affect the outcome.
 
 Run via `make benchmark` or `python scripts/benchmark.py`.
 """
@@ -99,6 +98,8 @@ def main() -> int:
     # ── Latency run (REPS reps × 50 queries) ────────────────────────────
     print(f"Latency — P50 / P95 / P99 over {REPS_PER_QUERY * len(golden)} calls/mode")
     for mode in ("keyword", "semantic", "hybrid"):
+        for q in golden[:10]:
+            searcher.search(q["query"], mode=mode, top_k=TOP_K, rrf_k=RRF_K)
         latencies = []
         for _ in range(REPS_PER_QUERY):
             for q in golden:
@@ -120,7 +121,7 @@ def main() -> int:
         print(f"PASS — hybrid beats keyword by {delta_kw:+.1f}pp, semantic by {delta_sem:+.1f}pp")
         return 0
     print(f"FAIL — hybrid did NOT beat both pure modes (kw={avg_kw:.1%} sem={avg_sem:.1%} hyb={avg_hyb:.1%})")
-    print("       Check your RRF implementation: score(d) = sum_r 1/(k + rank_r(d)), k=60")
+    print("       Inspect slices and embedding quality; RRF alone does not guarantee a win.")
     return 1
 
 
